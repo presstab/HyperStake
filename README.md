@@ -1,4 +1,4 @@
-#HyperStake
+# HyperStake
 
 Copyright (c) 2013-2017 HyperStake Developers
 Copyright (c) 2013 NovaCoin Developers
@@ -42,7 +42,7 @@ Start up the new hyperstaked.
 
 
 See the hyperstake site:
-  http://hyperstake.com/
+  http://hyperstake.io
 for help and more information.
 
 Wallet themes

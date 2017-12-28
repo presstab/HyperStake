@@ -95,12 +95,7 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("keypoololdest", (boost::int64_t)pwalletMain->GetOldestKeyPoolTime()));
     obj.push_back(Pair("keypoolsize",   pwalletMain->GetKeyPoolSize()));
     obj.push_back(Pair("paytxfee",      ValueFromAmount(nTransactionFee)));
-	bool nStaking = false;
-	if(mapHashedBlocks.count(nBestHeight))
-		nStaking = true;
-	else if(mapHashedBlocks.count(nBestHeight - 1) && nLastCoinStakeSearchInterval)
-		nStaking = true;	
-	obj.push_back(Pair("staking status", (nStaking ? "Staking Active" : "Staking Not Active")));
+	obj.push_back(Pair("staking status", (fWalletStaking ? "Staking Active" : "Staking Not Active")));
 	
 	std::string strLockState = "";
 	if(pwalletMain->IsLocked())
@@ -806,7 +801,7 @@ Value addmultisigaddress(const Array& params, bool fHelp)
     if ((int)keys.size() < nRequired)
         throw runtime_error(
             strprintf("not enough keys supplied "
-                      "(got %"PRIszu" keys, but need at least %d to redeem)", keys.size(), nRequired));
+                      "(got %lu keys, but need at least %d to redeem)", keys.size(), nRequired));
     std::vector<CKey> pubkeys;
     pubkeys.resize(keys.size());
     for (unsigned int i = 0; i < keys.size(); i++)
@@ -2799,4 +2794,38 @@ Value getstakingstatus(const Array& params, bool fHelp)
 
     return obj;
 }
-	
+
+// HyperStake
+Value sendproposal(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "sendproposal <proposal hash>\n"
+                "Sends a vote proposal to the network. WARNING this adds a transaction fee of 5 HYP!\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"txid\": hash,             (string) the hash of the transaction that was sent\n"
+                "}\n");
+
+    if (pwalletMain->IsLocked())
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Unlock wallet to use this feature");
+
+    uint256 hashProposal(params[0].get_str());
+
+    //! See if this proposal exists in our map of pending proposals
+    if (!mapPendingProposals.count(hashProposal))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot find proposal");
+
+    CTransaction tx = mapPendingProposals.at(hashProposal);
+    CWalletTx wtx(pwalletMain, tx);
+
+    //! Broadcast the transaction to the network
+    CReserveKey reserveKey = CReserveKey(pwalletMain);
+    if (!pwalletMain->CommitTransaction(wtx, reserveKey))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Failed to commit transaction");
+
+    Object ret;
+    ret.push_back(Pair("txid", wtx.GetHash().GetHex()));
+
+    return ret;
+}

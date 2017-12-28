@@ -5,6 +5,8 @@
 
 #include "main.h"
 #include "bitcoinrpc.h"
+#include "voteproposal.h"
+#include "voteobject.h"
 
 #include <iostream>
 #include <fstream>
@@ -98,7 +100,7 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPri
     result.push_back(Pair("flags", strprintf("%s%s", blockindex->IsProofOfStake()? "proof-of-stake" : "proof-of-work", blockindex->GeneratedStakeModifier()? " stake-modifier": "")));
     result.push_back(Pair("proofhash", blockindex->IsProofOfStake()? blockindex->hashProofOfStake.GetHex() : blockindex->GetBlockHash().GetHex()));
     result.push_back(Pair("entropybit", (int)blockindex->GetStakeEntropyBit()));
-    result.push_back(Pair("modifier", strprintf("%016"PRI64x, blockindex->nStakeModifier)));
+    result.push_back(Pair("modifier", strprintf("%016llx", blockindex->nStakeModifier)));
     result.push_back(Pair("modifierchecksum", strprintf("%08x", blockindex->nStakeModifierChecksum)));
     Array txinfo;
     BOOST_FOREACH (const CTransaction& tx, block.vtx)
@@ -298,3 +300,57 @@ Value listblocks(const Array& params, bool fHelp)
 
     return arrRet;
 }
+
+// tuningmind
+Value createproposal(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 6)
+        throw runtime_error(
+                "CreateProposal <strName>\n<nShift>\n<nStartTime>\n<nCheckSpan>\n<nCardinals>\n<strDescription>\n"
+                "Returns new VoteProposal object with specified parameters\n");
+    // name of issue
+    string strName = params[0].get_str();
+    // check version for existing proposals Shift
+    uint8_t nShift = params[1].get_int();
+    // start time - will be changed to int StartHeight. unix time stamp
+    int64 nStartTime =  params[2].get_int();
+    // number of blocks with votes to count
+    int nCheckSpan = params[3].get_int();
+    // cardinal items to vote on - convert to uint8 CheckSpan
+    uint8_t nCardinals = params[4].get_int();
+    // description of issue - will go in different tx
+    std::string strDescription = params[5].get_str();
+
+    Object results;
+
+    CVoteProposal proposal(
+        strName,
+        nShift,
+        nStartTime,
+        nCheckSpan,
+        nCardinals,
+        strDescription
+    );
+    CVoteObject testVote(proposal, 4);
+    uint32_t nVersion = CBlock::CURRENT_VERSION;
+    results.push_back(Pair("added to header", testVote.AddVoteToHeader(nVersion)));
+
+    //! Add the constructed proposal to a partial transaction
+    CTransaction tx;
+    proposal.ConstructTransaction(tx);
+
+    //! Add the partial transaction to our globally accessible proposals map so that it can be called from elsewhere
+    uint256 hashProposal = tx.GetHash();
+    mapPendingProposals.insert(make_pair(hashProposal, tx));
+
+    results.push_back(Pair("proposal_hash", hashProposal.GetHex().c_str()));
+    results.push_back(Pair("name", strName));
+    results.push_back(Pair("shift", nShift));
+    results.push_back(Pair("start time", (boost::int64_t)nStartTime));
+    results.push_back(Pair("check span", nCheckSpan));
+    results.push_back(Pair("cardinals", nCardinals));
+    results.push_back(Pair("description", strDescription));
+
+    return results;
+}
+

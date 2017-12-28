@@ -287,6 +287,8 @@ static const CRPCCommand vRPCCommands[] =
 	{ "setgenerate",            &setgenerate,            true,   false },
     { "gethashespersec",        &gethashespersec,        true,   false },
 	{ "listblocks",             &listblocks,             false,  false },
+    { "createproposal",         &createproposal,         false,  false },
+    { "sendproposal",           &sendproposal,           false,  false },
 	{ "hashsettings",           &hashsettings,           false,  false },
 	{ "gettxfee",               &gettxfee,               false,  false },
     { "getstakingstatus",       &getstakingstatus,       false,  false },
@@ -382,7 +384,7 @@ static string HTTPReply(int nStatus, const string& strMsg, bool keepalive)
             "HTTP/1.1 %d %s\r\n"
             "Date: %s\r\n"
             "Connection: %s\r\n"
-            "Content-Length: %"PRIszu"\r\n"
+            "Content-Length: %lu\r\n"
             "Content-Type: application/json\r\n"
             "Server: HyperStake-json-rpc/%s\r\n"
             "\r\n"
@@ -1230,6 +1232,10 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
 	if (strMethod == "strictincoming" && n > 0)      ConvertTo<bool>(params[0]);
 	if (strMethod == "listblocks" && n > 0)      ConvertTo<int>(params[0]);
     if (strMethod == "listblocks" && n > 1)      ConvertTo<int>(params[1]);
+    if (strMethod == "createproposal" && n > 1)      ConvertTo<int>(params[1]);
+    if (strMethod == "createproposal" && n > 2)      ConvertTo<int>(params[2]);
+    if (strMethod == "createproposal" && n > 3)      ConvertTo<int>(params[3]);
+    if (strMethod == "createproposal" && n > 4)      ConvertTo<int>(params[4]);
     return params;
 }
 

@@ -11,7 +11,7 @@
 #include "script.h"
 #include "scrypt_mine.h"
 #include "hashblock.h"
-
+#include <iostream>
 #include <list>
 
 class CWallet;
@@ -95,9 +95,11 @@ extern bool fHaveGUI;
 extern std::map<unsigned int, unsigned int> mapHashedBlocks;
 extern std::map<std::string, std::pair<int, int> > mapGetBlocksRequests;
 extern std::map <std::string, int> mapPeerRejectedBlocks;
+extern std::map<uint256, CTransaction> mapPendingProposals;
 extern bool fStrictProtocol;
 extern bool fStrictIncoming;
 extern bool fGenerateBitcoins;
+extern bool fWalletStaking;
 
 // Settings
 extern int64 nTransactionFee;
@@ -537,6 +539,7 @@ public:
         return (IsCoinBase() || IsCoinStake());
     }
 
+    bool IsProposal() const;
 
     /** Check for standard transaction types
         @return True if all outputs (scriptPubKeys) use only standard transaction forms
@@ -650,14 +653,14 @@ public:
     {
         std::string str;
         str += IsCoinBase()? "Coinbase" : (IsCoinStake()? "Coinstake" : "CTransaction");
-        str += strprintf("(hash=%s, nTime=%d, ver=%d, vin.size=%"PRIszu", vout.size=%"PRIszu", nLockTime=%d)\n",
-            GetHash().ToString().substr(0,10).c_str(),
-            nTime,
-            nVersion,
-            vin.size(),
-            vout.size(),
-            nLockTime
-			);
+        str += strprintf("(hash=%s, nTime=%d, ver=%d, vin.size=%lu, vout.size=%lu, nLockTime=%d)\n",
+                         GetHash().ToString().substr(0,10).c_str(),
+                         nTime,
+                         nVersion,
+                         vin.size(),
+                         vout.size(),
+                         nLockTime
+                         );
 
         for (unsigned int i = 0; i < vin.size(); i++)
             str += "    " + vin[i].ToString() + "\n";
@@ -847,6 +850,7 @@ public:
 
     // memory only
     mutable std::vector<uint256> vMerkleTree;
+    uint256 hashBlock;
 
     // Denial-of-service detection:
     mutable int nDoS;
@@ -899,10 +903,9 @@ public:
         return (nBits == 0);
     }
 
-    uint256 GetHash() const
-    {
-        return Hash9(BEGIN(nVersion), END(nNonce));
-    }
+    uint256 GetHash() const;
+
+    void SetHash(uint256 hash){ this->hashBlock = hash; }
 
     int64 GetBlockTime() const
     {
@@ -1053,14 +1056,16 @@ public:
 
     void print() const
     {
-        printf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%"PRIszu", vchBlockSig=%s)\n",
-            GetHash().ToString().c_str(),
-            nVersion,
-            hashPrevBlock.ToString().c_str(),
-            hashMerkleRoot.ToString().c_str(),
-            nTime, nBits, nNonce,
-            vtx.size(),
-            HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str());
+        std::cout << "CBlock(hash="
+                  << GetHash().ToString().c_str() 
+                  << " ver = " << nVersion
+                  << " hashPrevBlock = " << hashPrevBlock.ToString().c_str()
+                  << " hasMerkleRoot = " << hashMerkleRoot.ToString().c_str()
+                  << " nTime = " << nTime
+                  << " nBits = " << nBits
+                  << " nNonce = " <<  nNonce
+                  << " vtx = " << vtx.size()
+                  << " vhcBlockSig = " << HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str();
         for (unsigned int i = 0; i < vtx.size(); i++)
         {
             printf("  ");
@@ -1304,7 +1309,7 @@ public:
 
     std::string ToString() const
     {
-        return strprintf("CBlockIndex(nprev=%p, pnext=%p, nFile=%u, nBlockPos=%-6d nHeight=%d, nMint=%s, nMoneySupply=%s, nFlags=(%s)(%d)(%s), nStakeModifier=%016"PRI64x", nStakeModifierChecksum=%08x, hashProofOfStake=%s, prevoutStake=(%s), nStakeTime=%d merkle=%s, hashBlock=%s)",
+        return strprintf("CBlockIndex(nprev=%p, pnext=%p, nFile=%u, nBlockPos=%-6d nHeight=%d, nMint=%s, nMoneySupply=%s, nFlags=(%s)(%d)(%s), nStakeModifier=%016llu, nStakeModifierChecksum=%08x, hashProofOfStake=%s, prevoutStake=(%s), nStakeTime=%d merkle=%s, hashBlock=%s)",
             pprev, pnext, nFile, nBlockPos, nHeight,
             FormatMoney(nMint).c_str(), FormatMoney(nMoneySupply).c_str(),
             GeneratedStakeModifier() ? "MOD" : "-", GetStakeEntropyBit(), IsProofOfStake()? "PoS" : "PoW",
