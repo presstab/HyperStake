@@ -41,6 +41,7 @@ enum txnouttype
     TX_PUBKEYHASH,
     TX_SCRIPTHASH,
     TX_MULTISIG,
+    TX_HYPERCHAIN,
     TX_NULL_DATA
 };
 
@@ -56,7 +57,7 @@ public:
  *  * CScriptID: TX_SCRIPTHASH destination
  *  A CTxDestination is the internal data type encoded in a CBitcoinAddress
  */
-typedef boost::variant<CNoDestination, CKeyID, CScriptID> CTxDestination;
+typedef boost::variant<CNoDestination, CKeyID, CScriptID, CChannelID> CTxDestination;
 
 const char* GetTxnOutputType(txnouttype t);
 
@@ -195,7 +196,37 @@ enum opcodetype
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
 
-
+    // HyperChain
+    OP_HYPERCHAIN = 0xc0,
+    OP_HC01 = 0xc1,
+    OP_HC02 = 0xc2,
+    OP_HC03 = 0xc3,
+    OP_HC04 = 0xc4,
+    OP_HC05 = 0xc5,
+    OP_HC06 = 0xc6,
+    OP_HC07 = 0xc7,
+    OP_HC08 = 0xc8,
+    OP_HC09 = 0xc9,
+    OP_HC10 = 0xd0,
+    OP_HC11 = 0xd1,
+    OP_HC12 = 0xd2,
+    OP_HC13 = 0xd3,
+    OP_HC14 = 0xd4,
+    OP_HC15 = 0xd5,
+    OP_HC16 = 0xd6,
+    OP_HC17 = 0xd7,
+    OP_HC18 = 0xd8,
+    OP_HC19 = 0xd9,
+    OP_HC20 = 0xe0,
+    OP_HC21 = 0xe1,
+    OP_HC22 = 0xe2,
+    OP_HC23 = 0xe3,
+    OP_HC24 = 0xe4,
+    OP_HC25 = 0xe5,
+    OP_HC26 = 0xe6,
+    OP_HC27 = 0xe7,
+    OP_HC28 = 0xe8,
+    OP_HC29 = 0xe9,
 
     // template matching params
     OP_SMALLINTEGER = 0xfa,
@@ -518,6 +549,7 @@ public:
     unsigned int GetSigOpCount(const CScript& scriptSig) const;
 
     bool IsPayToScriptHash() const;
+    bool IsHyperChainSignal() const;
 
     bool IsPushOnly(const_iterator pc) const;
 

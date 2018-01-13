@@ -103,6 +103,7 @@ const char* GetTxnOutputType(txnouttype t)
     case TX_SCRIPTHASH: return "scripthash";
     case TX_MULTISIG: return "multisig";
     case TX_NULL_DATA: return "nulldata";
+    case TX_HYPERCHAIN: return "hyperchain";
     }
     return NULL;
 }
@@ -239,7 +240,37 @@ const char* GetOpName(opcodetype opcode)
     case OP_NOP9                   : return "OP_NOP9";
     case OP_NOP10                  : return "OP_NOP10";
 
-
+    // HyperChain
+    case OP_HYPERCHAIN             : return "OP_HYPERCHAIN";
+    case OP_HC01                   : return "OP_HC01";
+    case OP_HC02                   : return "OP_HC02";
+    case OP_HC03                   : return "OP_HC03";
+    case OP_HC04                   : return "OP_HC04";
+    case OP_HC05                   : return "OP_HC05";
+    case OP_HC06                   : return "OP_HC06";
+    case OP_HC07                   : return "OP_HC07";
+    case OP_HC08                   : return "OP_HC08";
+    case OP_HC09                   : return "OP_HC09";
+    case OP_HC10                   : return "OP_HC10";
+    case OP_HC11                   : return "OP_HC11";
+    case OP_HC12                   : return "OP_HC12";
+    case OP_HC13                   : return "OP_HC13";
+    case OP_HC14                   : return "OP_HC14";
+    case OP_HC15                   : return "OP_HC15";
+    case OP_HC16                   : return "OP_HC16";
+    case OP_HC17                   : return "OP_HC17";
+    case OP_HC18                   : return "OP_HC18";
+    case OP_HC19                   : return "OP_HC19";
+    case OP_HC20                   : return "OP_HC20";
+    case OP_HC21                   : return "OP_HC21";
+    case OP_HC22                   : return "OP_HC22";
+    case OP_HC23                   : return "OP_HC23";
+    case OP_HC24                   : return "OP_HC24";
+    case OP_HC25                   : return "OP_HC25";
+    case OP_HC26                   : return "OP_HC26";
+    case OP_HC27                   : return "OP_HC27";
+    case OP_HC28                   : return "OP_HC28";
+    case OP_HC29                   : return "OP_HC29";
 
     // template matching params
     case OP_PUBKEYHASH             : return "OP_PUBKEYHASH";
@@ -1259,6 +1290,15 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
         return true;
     }
 
+
+    //HyperChain Signals
+    if (scriptPubKey.IsHyperChainSignal()) {
+        typeRet = TX_HYPERCHAIN;
+        vector<unsigned char> hashBytes(scriptPubKey.begin()+3, scriptPubKey.begin()+23);
+        vSolutionsRet.push_back(hashBytes);
+        return true;
+    }
+
     // Provably prunable, data-carrying output
     //
     // So long as script passes the IsUnspendable() test and all but the first
@@ -1426,6 +1466,8 @@ bool Solver(const CKeyStore& keystore, const CScript& scriptPubKey, uint256 hash
         return (SignN(vSolutions, keystore, hash, nHashType, scriptSigRet));
     case TX_NULL_DATA:
          return true;
+    case TX_HYPERCHAIN:
+        return false;
     }
     return false;
 }
@@ -1448,6 +1490,8 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
         return 1; // doesn't include args needed by the script
     case TX_NULL_DATA:
         return 0;
+    case TX_HYPERCHAIN:
+        return 1;
     }
     return -1;
 }
@@ -1495,6 +1539,7 @@ public:
     CKeyStoreIsMineVisitor(const CKeyStore *keystoreIn) : keystore(keystoreIn) { }
     bool operator()(const CNoDestination &dest) const { return false; }
     bool operator()(const CKeyID &keyID) const { return keystore->HaveKey(keyID); }
+    bool operator()(const CChannelID &channelID) const { return keystore->HaveKey(channelID); }
     bool operator()(const CScriptID &scriptID) const { return keystore->HaveCScript(scriptID); }
 };
 
@@ -1539,6 +1584,8 @@ bool IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
         vector<valtype> keys(vSolutions.begin()+1, vSolutions.begin()+vSolutions.size()-1);
         return HaveKeys(keys, keystore) == keys.size();
     }
+    case TX_HYPERCHAIN:
+        return false;
     }
     return false;
 }
@@ -1563,6 +1610,11 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     else if (whichType == TX_SCRIPTHASH)
     {
         addressRet = CScriptID(uint160(vSolutions[0]));
+        return true;
+    }
+    else if (whichType == TX_HYPERCHAIN)
+    {
+        addressRet = CChannelID(uint160(vSolutions[0]));
         return true;
     }
     // Multisig txns have more than one address...
@@ -1765,6 +1817,7 @@ static CScript CombineSignatures(CScript scriptPubKey, const CTransaction& txTo,
     switch (txType)
     {
     case TX_NONSTANDARD:
+    case TX_HYPERCHAIN:
     case TX_NULL_DATA:
         // Don't know anything about this, assume bigger one is correct:
         if (sigs1.size() >= sigs2.size())
@@ -1875,6 +1928,21 @@ bool CScript::IsPayToScriptHash() const
             this->at(22) == OP_EQUAL);
 }
 
+bool IsHyperChainCode(const unsigned char& c)
+{
+    return c > OP_HYPERCHAIN && c < OP_SMALLINTEGER;
+}
+
+bool CScript::IsHyperChainSignal() const
+{
+    return (this->size() > 10 &&
+            this->at(0) == OP_HYPERCHAIN &&
+            this->at(1) == OP_HASH160 &&
+            this->at(2) == 0x14 && //todo change to equal X)
+            (IsHyperChainCode(this->at(23))  || IsHyperChainCode(this->at(24)))
+    );
+}
+
 class CScriptVisitor : public boost::static_visitor<bool>
 {
 private:
@@ -1890,6 +1958,12 @@ public:
     bool operator()(const CKeyID &keyID) const {
         script->clear();
         *script << OP_DUP << OP_HASH160 << keyID << OP_EQUALVERIFY << OP_CHECKSIG;
+        return true;
+    }
+
+    bool operator()(const CChannelID& channelID) const {
+        script->clear();
+        *script << OP_DUP << OP_HASH160 << channelID << OP_EQUALVERIFY << OP_CHECKSIG;
         return true;
     }
 

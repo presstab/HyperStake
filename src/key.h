@@ -52,6 +52,14 @@ public:
     CKeyID(const uint160 &in) : uint160(in) { }
 };
 
+/** A reference to a CKey that is used for a HyperChain channel: hash160 of its serialized public key */
+class CChannelID : public uint160
+{
+public:
+    CChannelID() : uint160(0) { }
+    CChannelID(const uint160& in) : uint160(in) { }
+};
+
 /** A reference to a CScript: the Hash160 of its serialization (see script.h) */
 class CScriptID : public uint160
 {
@@ -99,6 +107,10 @@ public:
 
     CKeyID GetID() const {
         return CKeyID(Hash160(vchPubKey));
+    }
+
+    CChannelID GetChannelID() const {
+        return CChannelID(Hash160(vchPubKey));
     }
 
     uint256 GetHash() const {

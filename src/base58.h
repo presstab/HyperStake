@@ -284,6 +284,7 @@ public:
     CBitcoinAddressVisitor(CBitcoinAddress *addrIn) : addr(addrIn) { }
     bool operator()(const CKeyID &id) const;
     bool operator()(const CScriptID &id) const;
+    bool operator()(const CChannelID& id) const;
     bool operator()(const CNoDestination &no) const;
 };
 
@@ -293,7 +294,8 @@ public:
     enum
     {
         PUBKEY_ADDRESS = 117,  // HyperStake addresses begin with 't'
-        SCRIPT_ADDRESS = 8, 
+        SCRIPT_ADDRESS = 8,
+        HYPERCHAIN_CHANNEL = 195, //todo: make this an 'X'
         PUBKEY_ADDRESS_TEST = 109,
         SCRIPT_ADDRESS_TEST = 196,
     };
@@ -321,6 +323,10 @@ public:
         {
             case PUBKEY_ADDRESS:
                 nExpectedSize = 20; // Hash of public key
+                fExpectTestNet = false;
+                break;
+            case HYPERCHAIN_CHANNEL :
+                nExpectedSize = 20; // Hash of channel's public key
                 fExpectTestNet = false;
                 break;
             case SCRIPT_ADDRESS:
@@ -371,6 +377,11 @@ public:
             uint160 id;
             memcpy(&id, &vchData[0], 20);
             return CKeyID(id);
+        }
+        case HYPERCHAIN_CHANNEL : {
+            uint160 id;
+            mempcpy(&id, &vchData[0], 20);
+            return CChannelID(id);
         }
         case SCRIPT_ADDRESS:
         case SCRIPT_ADDRESS_TEST: {
