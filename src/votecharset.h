@@ -1,4 +1,13 @@
 #include <string>
 
-bool ConvertTo6bit(std::string strFromUser, std::vector<unsigned char>& vchRet);
-bool ConvertTo8bit(std::vector<unsigned char> vch, std::string& strRet);
+class CSixBitChar
+{
+private:
+    std::vector<unsigned char> vch;
+
+public:
+    bool FromString(std::string str);
+    void SetVCH(std::vector<unsigned char> vchNew) { this->vch = vchNew; }
+    std::string ToString() const;
+    std::vector<unsigned char> const GetVCH() { return vch; }
+};

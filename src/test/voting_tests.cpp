@@ -129,13 +129,15 @@ BOOST_AUTO_TEST_CASE(vote_tally)
 
 BOOST_AUTO_TEST_CASE(vote_charset)
 {
-    std::string someString;
-    std::vector<unsigned char> vch;
-    BOOST_CHECK_MESSAGE(ConvertTo6bit("test proposal text", vch), "6 bit character conversion failed");
-    cout << "converted string: " << ReverseEndianString(HexStr(vch)) << endl;
-    BOOST_CHECK_MESSAGE(ConvertTo8bit(vch, someString), "failed to deconvert");
+    string strTest = "testing Various th1ngS!!?.";
+    CSixBitChar sixstr;
+    BOOST_CHECK_MESSAGE(sixstr.FromString(strTest), "6 bit character conversion failed");
+    std::vector<unsigned char> vch = sixstr.GetVCH();
+    BOOST_CHECK_MESSAGE(sixstr.ToString() == "testing various th1ngs!!?.", "failed to deconvert");
 
-    cout << "deconverted string: " << someString << endl;
+    CSixBitChar sixstr2;
+    sixstr2.SetVCH(vch);
+    BOOST_CHECK_MESSAGE(sixstr2.ToString() == "testing various th1ngs!!?.", "failed to deconvert");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
