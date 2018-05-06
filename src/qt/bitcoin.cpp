@@ -45,6 +45,7 @@ Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin);
 Q_IMPORT_PLUGIN(QCocoaIntegrationPlugin);
 #endif
 #endif
+#endif
 
 // Need a global reference for the notifications to find the GUI
 static BitcoinGUI *guiref;
