@@ -46,6 +46,7 @@ BITCOIN_CORE_H = \
   crypter.h \
   db.h \
   hashblock.h \
+  hyperchain/channel.h \
   init.h \
   kernel.h \
   key.h \
@@ -86,7 +87,6 @@ BITCOIN_CORE_H = \
   votecharset.h \
   votetally.h
 
-
 JSON_H = \
   json/json_spirit.h \
   json/json_spirit_error_position.h \
@@ -118,6 +118,7 @@ libbitcoin_server_a_SOURCES = \
   cubehash.c \
   echo.c \
   groestl.c \
+  hyperchain/channel.cpp \
   init.cpp \
   jh.c \
   keccak.c \

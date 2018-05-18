@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Bitcoin developers
+// Copyright (c) 2018 The HyperStake developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifndef BITCOIN_DB_H
@@ -17,6 +18,7 @@
 class CAddress;
 class CAddrMan;
 class CBlockLocator;
+class CChannel;
 class CDiskBlockIndex;
 class CDiskTxPos;
 class CMasterKey;
@@ -312,12 +314,6 @@ public:
     bool static Rewrite(const std::string& strFile, const char* pszSkip = NULL);
 };
 
-
-
-
-
-
-
 /** Access to the transaction database (blkindex.dat) */
 class CTxDB : public CDB
 {
@@ -359,7 +355,19 @@ public:
     bool ReadProposal(const uint256& hash, CVoteProposal& proposal);
 };
 
-
+class CHyperChainDB : public CDB
+{
+public:
+    CHyperChainDB(const char* pszMode="r+") : CDB("hyperchain.dat", pszMode) { }
+private:
+    CHyperChainDB(const CHyperChainDB&);
+    void operator=(const CHyperChainDB&);
+public:
+    bool EraseChannelSubscription(const CChannel& channel);
+    bool ListSubscriptions(std::set<CChannelID>& setChannels);
+    bool ReadChannelSubscription(const CChannelID& id, CChannel& channel);
+    bool WriteChannelSubscription(const CChannel& channel);
+};
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

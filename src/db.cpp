@@ -9,6 +9,7 @@
 #include "util.h"
 #include "main.h"
 #include "kernel.h"
+#include "hyperchain/channel.h"
 #include <boost/version.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -920,11 +921,30 @@ bool CVoteDB::WriteProposal(const uint256 &hash, const CVoteProposal &proposal)
     return Write(make_pair(string("prop"), hash), proposal);
 }
 
-bool CVoteDB::ReadProposal(const uint256 &hash, CVoteProposal &proposal)
+bool CVoteDB::ReadProposal(const uint256 &hash, CVoteProposal& proposal)
 {
     return Read(make_pair(string("prop"), hash), proposal);
 }
 
+bool CHyperChainDB::EraseChannelSubscription(const CChannel& channel)
+{
+    return Erase(std::make_pair(std::string("sub"), channel.GetID()));
+}
+
+bool CHyperChainDB::ListSubscriptions(std::set<CChannelID>& setChannels)
+{
+    return true; //todo
+}
+
+bool CHyperChainDB::ReadChannelSubscription(const CChannelID& id, CChannel& channel)
+{
+    return Read(std::make_pair(std::string("sub"), id), channel);
+}
+
+bool CHyperChainDB::WriteChannelSubscription(const CChannel& channel)
+{
+    return Write(std::make_pair(std::string("sub"), channel.GetID()), channel);
+}
 
 //
 // CAddrDB

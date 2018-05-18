@@ -3,7 +3,34 @@ project(HyperStake)
 
 set(CMAKE_CXX_STANDARD 11)
 
+include_directories(src/)
+include_directories(src/qt)
+
+include_directories(src
+        src/univalue/include
+        /usr/include/x86_64-linux-gnu/qt5/QtCLucene
+        /usr/include/x86_64-linux-gnu/qt5/QtCore
+        /usr/include/x86_64-linux-gnu/qt5/QtDesigner
+        /usr/include/x86_64-linux-gnu/qt5/QtGui
+        /usr/include/x86_64-linux-gnu/qt5/QtNetwork
+        /usr/include/x86_64-linux-gnu/qt5/QtPlatformHeaders
+        /usr/include/x86_64-linux-gnu/qt5/QtSql
+        /usr/include/x86_64-linux-gnu/qt5/QtUiPlugin
+        /usr/include/x86_64-linux-gnu/qt5/QtWidgets
+        /usr/include/x86_64-linux-gnu/qt5/QtConcurrent
+        /usr/include/x86_64-linux-gnu/qt5/QtDBus
+        /usr/include/x86_64-linux-gnu/qt5/QtDesignerComponents
+        /usr/include/x86_64-linux-gnu/qt5/QtHelp
+        /usr/include/x86_64-linux-gnu/qt5/QtOpenGLExtensions
+        /usr/include/x86_64-linux-gnu/qt5/QtPrintSupport
+        /usr/include/x86_64-linux-gnu/qt5/QtTest
+        /usr/include/x86_64-linux-gnu/qt5/QtUiTools
+        /usr/include/x86_64-linux-gnu/qt5/QtXml
+        /usr/lib/x86_64-linux-gnu/qt5
+        )
+
 add_executable(HyperStake
+        src/test/hyperchain_tests.cpp
         src/config/bitcoin-config.h
         src/json/json_spirit.h
         src/json/json_spirit_error_position.h
@@ -299,6 +326,8 @@ add_executable(HyperStake
         src/qt/setvotesdialog.h
         src/votetally.cpp
         src/votetally.h
+        src/hyperchain/channel.cpp
+        src/hyperchain/channel.h
         src/wallet.cpp
         src/wallet.h
         src/walletdb.cpp

@@ -293,20 +293,28 @@ class CBitcoinAddress : public CBase58Data
 public:
     enum
     {
-        PUBKEY_ADDRESS = 117,  // HyperStake addresses begin with 't'
+        PUBKEY_ADDRESS = 117,  // HyperStake addresses begin with 'p'
         SCRIPT_ADDRESS = 8,
-        HYPERCHAIN_CHANNEL = 195, //todo: make this an 'X'
+        HYPERCHAIN_CHANNEL = 75, //'X'
         PUBKEY_ADDRESS_TEST = 109,
         SCRIPT_ADDRESS_TEST = 196,
     };
 
-    bool Set(const CKeyID &id) {
+    bool Set(const CKeyID& id)
+    {
         SetData(fTestNet ? PUBKEY_ADDRESS_TEST : PUBKEY_ADDRESS, &id, 20);
         return true;
     }
 
-    bool Set(const CScriptID &id) {
+    bool Set(const CScriptID& id)
+    {
         SetData(fTestNet ? SCRIPT_ADDRESS_TEST : SCRIPT_ADDRESS, &id, 20);
+        return true;
+    }
+
+    bool Set(const CChannelID& id)
+    {
+        SetData(HYPERCHAIN_CHANNEL, &id, 20);
         return true;
     }
 

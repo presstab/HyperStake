@@ -11,7 +11,7 @@ BOOST_AUTO_TEST_CASE(create_channel)
 {
     CKey key;
     key.MakeNewKey(true);
-    CPubKey keyChannel = key.GetPubKey()
+    CPubKey keyChannel = key.GetPubKey();
     CChannelID id = keyChannel.GetChannelID();
     CBitcoinAddress address(id);
     cout << address.ToString();
