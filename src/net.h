@@ -222,6 +222,10 @@ public:
     CBlockIndex* pindexLastGetBlocksBegin;
     uint256 hashLastGetBlocksEnd;
     int nStartingHeight;
+    int64_t nTimeLastGetBlocks;
+    uint256 hashLastBlockSent;
+    uint256 hashLastHeaderSent;
+    uint256 hashLastBlockRequest;
 
     // flood relay
     std::vector<CAddress> vAddrToSend;
@@ -267,6 +271,7 @@ public:
         nMisbehavior = 0;
         hashCheckpointKnown = 0;
         setInventoryKnown.max_size(SendBufferSize() / 1000);
+        nTimeLastGetBlocks = 0;
 
         // Be shy and don't send version until we hear
         if (!fInbound)
@@ -367,7 +372,7 @@ public:
         // the key is the earliest time the request can be sent
         int64& nRequestTime = mapAlreadyAskedFor[inv];
         if (fDebugNet)
-            printf("askfor %s   %lld (%s)\n", inv.ToString().c_str(), nRequestTime, DateTimeStrFormat("%H:%M:%S", nRequestTime/1000000).c_str());
+            printf("askfor %s   %lld (%s) peer %s\n", inv.ToString().c_str(), nRequestTime, DateTimeStrFormat("%H:%M:%S", nRequestTime/1000000).c_str(), addrName.c_str());
 
         // Make sure not to reuse time indexes to keep things in the same order
         int64 nNow = (GetTime() - 1) * 1000000;
@@ -662,6 +667,7 @@ public:
 
 
     void PushGetBlocks(CBlockIndex* pindexBegin, uint256 hashEnd);
+    void PushGetHeaders(CBlockIndex* pindexBegin, uint256 hashEnd);
     bool IsSubscribed(unsigned int nChannel);
     void Subscribe(unsigned int nChannel, unsigned int nHops=0);
     void CancelSubscribe(unsigned int nChannel);

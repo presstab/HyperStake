@@ -104,6 +104,17 @@ void CNode::PushGetBlocks(CBlockIndex* pindexBegin, uint256 hashEnd)
     PushMessage("getblocks", CBlockLocator(pindexBegin), hashEnd);
 }
 
+void CNode::PushGetHeaders(CBlockIndex* pindexBegin, uint256 hashEnd)
+{
+    // Filter out duplicate requests
+    if (pindexBegin == pindexLastGetBlocksBegin && hashEnd == hashLastGetBlocksEnd)
+        return;
+    pindexLastGetBlocksBegin = pindexBegin;
+    hashLastGetBlocksEnd = hashEnd;
+
+    PushMessage("getheaders", CBlockLocator(pindexBegin), hashEnd);
+}
+
 // find 'best' local address for a particular peer
 bool GetLocal(CService& addr, const CNetAddr *paddrPeer)
 {

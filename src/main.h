@@ -19,6 +19,7 @@
 class CWallet;
 class CBlock;
 class CBlockIndex;
+class HeaderIndex;
 class CKeyItem;
 class CReserveKey;
 class COutPoint;
@@ -71,6 +72,7 @@ static const int64 MAX_TIME_SINCE_BEST_BLOCK = 10; // how many seconds to wait b
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
+extern std::map<uint256, std::shared_ptr<HeaderIndex> > mapHeaderIndex;
 extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
 extern uint256 hashGenesisBlock;
 extern CBlockIndex* pindexGenesisBlock;
@@ -82,6 +84,7 @@ extern CBigNum bnBestChainTrust;
 extern CBigNum bnBestInvalidTrust;
 extern uint256 hashBestChain;
 extern CBlockIndex* pindexBest;
+extern std::shared_ptr<HeaderIndex> pindexBestHeader;
 extern unsigned int nTransactionsUpdated;
 extern uint64 nLastBlockTx;
 extern uint64 nLastBlockSize;
@@ -1075,6 +1078,14 @@ public:
 
 private:
     bool SetBestChainInner(CTxDB& txdb, CBlockIndex *pindexNew);
+};
+
+struct HeaderIndex
+{
+    std::shared_ptr<CBlock> pheader;
+    std::shared_ptr<HeaderIndex> pprev;
+    std::shared_ptr<HeaderIndex> pnext;
+    int nHeight;
 };
 
 /** The block chain is a tree shaped structure starting with the

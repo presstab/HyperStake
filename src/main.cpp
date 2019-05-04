@@ -37,6 +37,7 @@ CTxMemPool mempool;
 unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
+std::map<uint256, std::shared_ptr<HeaderIndex> > mapHeaderIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20);
@@ -57,7 +58,8 @@ int nBestHeight = -1;
 CBigNum bnBestChainTrust = 0;
 CBigNum bnBestInvalidTrust = 0;
 uint256 hashBestChain = 0;
-CBlockIndex* pindexBest = NULL;
+CBlockIndex* pindexBest = nullptr;
+std::shared_ptr<HeaderIndex> pindexBestHeader = nullptr;
 int64 nTimeBestReceived = 0;
 bool fHaveGUI = false;
 
@@ -1959,6 +1961,21 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     // New best block
     hashBestChain = hash;
     pindexBest = pindexNew;
+    if (!mapHeaderIndex.count(hash)) {
+        //make header
+        auto pheader = std::shared_ptr<CBlock>(new CBlock());
+        *pheader = pindexNew->GetBlockHeader();
+
+        //make header index
+        auto pindexHeader = std::shared_ptr<HeaderIndex>(new HeaderIndex());
+        pindexHeader->pheader = pheader;
+        pindexHeader->nHeight = pindexNew->nHeight;
+        mapHeaderIndex.emplace(hash, pindexHeader);
+        if (!pindexBestHeader)
+            pindexBestHeader = pindexHeader;
+        printf("Add header index %s height %d\n", hashBlock.GetHex().c_str(), pindexHeader->nHeight);
+    }
+
     pblockindexFBBHLast = NULL;
     nBestHeight = pindexBest->nHeight;
     bnBestChainTrust = pindexNew->bnChainTrust;
@@ -2376,7 +2393,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock, std::string& strErr)
     {
         uint256 hashProofOfStake = 0;
         if (fFullCheck && !CheckProofOfStake(pblock->vtx[1], pblock->nBits, hashProofOfStake)) {
-			printf("WARNING: ProcessBlock(): check proof-of-stake failed for block %s\n", hash.ToString().c_str());
+			printf("WARNING: ProcessBlock(): check proof-of-stake failed for block:%s prevblock: %s\n", hash.ToString().c_str(), pblock->hashPrevBlock.GetHex().c_str());
 			return false;
         }
 
@@ -2406,7 +2423,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock, std::string& strErr)
         // Ask this guy to fill in what we're missing
         if (pfrom)
         {
-            pfrom->PushGetBlocks(pindexBest, GetOrphanRoot(pblock2));
+            pfrom->PushGetHeaders(pindexBest, GetOrphanRoot(pblock2));
             // ppcoin: getblocks may not obtain the ancestor block rejected
             // earlier by duplicate-stake check so we ask for it again directly
             if (!IsInitialBlockDownload())
@@ -2783,6 +2800,22 @@ bool LoadBlockIndex(bool fAllowNew)
             return error("LoadBlockIndex() : writing genesis block to disk failed");
         if (!block.AddToBlockIndex(nFile, nBlockPos))
             return error("LoadBlockIndex() : genesis block not accepted");
+    }
+
+    auto hash = hashBestChain;
+    if (!mapHeaderIndex.count(hash)) {
+        //make header
+        auto pheader = std::shared_ptr<CBlock>(new CBlock());
+        *pheader = pindexBest->GetBlockHeader();
+
+        //make header index
+        auto pindexHeader = std::shared_ptr<HeaderIndex>(new HeaderIndex());
+        pindexHeader->pheader = pheader;
+        pindexHeader->nHeight = pindexBest->nHeight;
+        mapHeaderIndex.emplace(hash, pindexHeader);
+        if (!pindexBestHeader)
+            pindexBestHeader = pindexHeader;
+        printf("Add header index %s height %d\n", hash.GetHex().c_str(), pindexHeader->nHeight);
     }
 
     return true;
@@ -3213,10 +3246,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             (pfrom->nStartingHeight > (nBestHeight - 144)) &&
             (pfrom->nVersion < NOBLKS_VERSION_START ||
              pfrom->nVersion >= NOBLKS_VERSION_END) &&
-             (nAskedForBlocks < 1 || vNodes.size() <= 1))
+             (nAskedForBlocks < 3 || vNodes.size() <= 1))
         {
             nAskedForBlocks++;
-            pfrom->PushGetBlocks(pindexBest, uint256(0));
+            printf("****sending getheaders to %s\n", pfrom->addrName.c_str());
+            pfrom->PushGetHeaders(pindexBest, uint256(0));
         }
 
         // Relay alerts
@@ -3234,12 +3268,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         // Be more aggressive with blockchain download. Send new getblocks() message after connection
         // to new node if waited longer than MAX_TIME_SINCE_BEST_BLOCK.
-        int64 TimeSinceBestBlock = GetTime() - nTimeBestReceived;
-        if (TimeSinceBestBlock > MAX_TIME_SINCE_BEST_BLOCK)
-        {
-            printf("INFO: Waiting %lld sec which is too long. Sending GetBlocks(0)\n", TimeSinceBestBlock);
-            pfrom->PushGetBlocks(pindexBest, uint256(0));
-        }
+//        int64 TimeSinceBestBlock = GetTime() - nTimeBestReceived;
+//        if (TimeSinceBestBlock > MAX_TIME_SINCE_BEST_BLOCK)
+//        {
+//            printf("INFO: Waiting %lld sec which is too long. Sending GetBlocks(0)\n", TimeSinceBestBlock);
+//            pfrom->PushGetBlocks(pindexBest, uint256(0));
+//        }
     }
 
 
@@ -3353,23 +3387,29 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
             bool fAlreadyHave = AlreadyHave(txdb, inv);
             if (fDebug)
-                printf("  got inventory: %s  %s\n", inv.ToString().c_str(), fAlreadyHave ? "have" : "new");
+                printf("  got inventory: %s  %s from peer %s\n", inv.ToString().c_str(), fAlreadyHave ? "have" : "new", pfrom->addrName.c_str());
 
-            if (!fAlreadyHave)
-                pfrom->AskFor(inv);
-            else if (inv.type == MSG_BLOCK && mapOrphanBlocks.count(inv.hash)) {
-                pfrom->PushGetBlocks(pindexBest, GetOrphanRoot(mapOrphanBlocks[inv.hash]));
-            } else if (nInv == nLastBlock) {
-                // In case we are on a very long side-chain, it is possible that we already have
-                // the last block in an inv bundle sent in response to getblocks. Try to detect
-                // this situation and push another getblocks to continue.
-                pfrom->PushGetBlocks(mapBlockIndex[inv.hash], uint256(0));
-                if (fDebug)
-                    printf("force request: %s\n", inv.ToString().c_str());
+            if (inv.type != MSG_BLOCK && IsInitialBlockDownload()) {
+                //Don't do anything with non block inventory during intial download
+            } else {
+                if (!fAlreadyHave) {
+                    pfrom->AskFor(inv);
+                    printf("Asking for inventory normal type:%d %s\n", inv.type, inv.hash.GetHex().c_str());
+                } else if (inv.type == MSG_BLOCK && mapOrphanBlocks.count(inv.hash)) {
+                    printf("Asking for pindexBest to orphan root\n");
+                    pfrom->PushGetHeaders(pindexBest, GetOrphanRoot(mapOrphanBlocks[inv.hash]));
+                } else if (nInv == nLastBlock) {
+                    // In case we are on a very long side-chain, it is possible that we already have
+                    // the last block in an inv bundle sent in response to getblocks. Try to detect
+                    // this situation and push another getblocks to continue.
+                    pfrom->PushGetHeaders(mapBlockIndex[inv.hash], uint256(0));
+                    if (fDebug)
+                        printf("force request: %s\n", inv.ToString().c_str());
+                }
+
+                // Track requests for our stuff
+                Inventory(inv.hash);
             }
-
-            // Track requests for our stuff
-            Inventory(inv.hash);
         }
     }
 
@@ -3444,7 +3484,15 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         }
     }
 
-
+    //a peer that we are syncing with, will often send get blocks after sending all blocks
+    else if (strCommand == "getblocks" && IsInitialBlockDownload())
+    {
+        if (pindexBest->GetBlockHash() == pfrom->hashLastBlockSent) {
+            //Now ask for more
+            pfrom->PushGetHeaders(pindexBest, uint256(0));
+            printf("Asking peer %s for more headers in response to a getblocks request\n", pfrom->addrName.c_str());
+        }
+    }
     else if (strCommand == "getblocks")
     {
         //clear our mapGetBlocksRequests every 3 minutes to prevent storing lots of data
@@ -3547,8 +3595,75 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         pfrom->PushMessage("headers", vHeaders);
     }
 
+    else if (strCommand == "headers") {
+        //see if these headers have anything that we need
+        printf("got headers from %s\n", pfrom->addrName.c_str());
+        CDataStream vMsg(vRecv);
+        std::vector<CBlock> vHeaders;
+        vMsg >> vHeaders;
+        std::vector<CInv> vAsk;
+        for (const CBlock& header : vHeaders) {
+            auto hashBlock = header.GetHash();
+            // Already have the full block
+            if (mapBlockIndex.count(hashBlock) || mapHeaderIndex.count(hashBlock))
+                continue;
 
-    else if (strCommand == "tx")
+            // Don't have any link to the previous block, no use in doing anything with this yet
+            if (!mapHeaderIndex.count(header.hashPrevBlock)) {
+                printf("No connection to previous blockhash %s\n", header.hashPrevBlock.GetHex().c_str());
+                continue;
+            }
+
+            // We want this because have prev block, but not next block.
+            // todo max reorg and prevent exhaustion
+            pfrom->hashLastHeaderSent = hashBlock;
+
+            //add this header to mapheaders for tracking
+            auto pheader = std::shared_ptr<CBlock>(new CBlock());
+            *pheader = header;
+
+            //make a new HeaderIndex
+            auto pindexHeader = std::shared_ptr<HeaderIndex>(new HeaderIndex());
+            pindexHeader->pheader = pheader;
+
+            //Link to other headerindexes
+            auto pprev = mapHeaderIndex.at(header.hashPrevBlock);
+            pindexHeader->pprev = pprev;
+            pprev->pnext = pindexHeader;
+
+            //assign height if it was not already set
+            pindexHeader->nHeight = pprev->nHeight + 1;
+
+            mapHeaderIndex.emplace(std::make_pair(hashBlock, pindexHeader));
+            printf("Add header index %s height %d\n", hashBlock.GetHex().c_str(), pindexHeader->nHeight);
+
+            //Update best known header
+            if (!pindexBestHeader) {
+                pindexBestHeader = pindexHeader;
+            } else {
+                //only assign it best header if its the highest header we have knowledge of
+                if (pindexHeader->nHeight > pindexBestHeader->nHeight)
+                    pindexBestHeader = pindexHeader;
+            }
+        }
+
+        //Only ask for a max of 500 so that the node does not get overloaded
+        int nAsk = 0;
+        if (mapHeaderIndex.count(pindexBest->GetBlockHash())) {
+            auto pindexHeader = mapHeaderIndex.at(pindexBest->GetBlockHash());
+            while (pindexHeader->pnext && nAsk < 500) {
+                pindexHeader = pindexHeader->pnext;
+                auto inv = CInv(MSG_BLOCK, pindexHeader->pheader->GetHash());
+                pfrom->AskFor(inv);
+                nAsk++;
+                pfrom->hashLastBlockRequest = inv.hash;
+            }
+        } else {
+            printf("pindexbest %s height %d not in header map\n", pindexBest->GetBlockHash().GetHex().c_str(), pindexBest->nHeight);
+        }
+    }
+
+    else if (strCommand == "tx" && !IsInitialBlockDownload())
     {
         vector<uint256> vWorkQueue;
         vector<uint256> vEraseQueue;
@@ -3622,16 +3737,21 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CBlock block;
         vRecv >> block;
 
-        printf("received block %s\n", block.GetHash().ToString().substr(0,20).c_str());
-        // block.print();
+        printf("received block %s peer %s\n", block.GetHash().ToString().substr(0,20).c_str(), pfrom->addrName.c_str());
+        uint256 hashBlock = block.GetHash();
+        pfrom->hashLastBlockSent = hashBlock;
 
-        CInv inv(MSG_BLOCK, block.GetHash());
+        CInv inv(MSG_BLOCK, hashBlock);
         pfrom->AddInventoryKnown(inv);
-
-        if (ProcessBlock(pfrom, &block)) 
+        bool fHavePrev = mapBlockIndex.count(block.hashPrevBlock) > 0;
+        if (fHavePrev && ProcessBlock(pfrom, &block)) {
             mapAlreadyAskedFor.erase(inv);
-		else 
-		{
+            if (pfrom->hashLastHeaderSent == hashBlock && IsInitialBlockDownload()) {
+                printf("%s: getheaders after last block recvd\n", __func__);
+                pfrom->PushGetHeaders(pindexBest, uint256(0));
+                pfrom->nTimeLastGetBlocks = GetTimeMillis();
+            }
+        } else if (fHavePrev) {
 			if(fStrictIncoming)
 			{
 				string strFrom = pfrom->addrName; 
@@ -3651,10 +3771,26 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             int64 TimeSinceBestBlock = GetTime() - nTimeBestReceived;
             if (TimeSinceBestBlock > MAX_TIME_SINCE_BEST_BLOCK)
 			{
-				printf("INFO: Waiting %lld sec which is too long. Sending GetBlocks(0)\n", TimeSinceBestBlock);
-                pfrom->PushGetBlocks(pindexBest, uint256(0));
+//				printf("INFO: Waiting %lld sec which is too long. Sending GetBlocks(0)\n", TimeSinceBestBlock);
+//				auto pindexAsk = pindexBest;
+//				for (unsigned int i = 0; i < 10000; i++) {
+//				    if (pindexAsk->pprev)
+//				        pindexAsk = pindexAsk->pprev;
+//				}
+//                pfrom->PushGetBlocks(pindexAsk, uint256(0));
             }
-        }
+        } else if (!fHavePrev) {
+		    if (pfrom->nTimeLastGetBlocks == 0 || GetTimeMillis() - pfrom->nTimeLastGetBlocks > 100) {
+                //This could be the top block sent from the peer, which signals to us that they are ready for another
+                //round of getblocks
+                printf("Asking for more headers from %s to %s peer %s\n", pindexBest->GetBlockHash().GetHex().c_str(),
+                       block.GetHash().GetHex().c_str(), pfrom->addrName.c_str());
+                pfrom->PushGetHeaders(pindexBest, hashBlock);
+                pfrom->nTimeLastGetBlocks = GetTimeMillis();
+            } else {
+		        printf("skipping getblocks\n");
+		    }
+		}
         if (block.nDoS) pfrom->Misbehaving(block.nDoS);
     }
 
@@ -4044,6 +4180,19 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         //
         // Message: getdata
         //
+        if (pto->mapAskFor.empty() && pindexBest->nHeight < pindexBestHeader->nHeight) {
+            //If we received all of the blocks we asked for, ask for more.
+            if (mapBlockIndex.count(pto->hashLastBlockRequest)) {
+                auto pindexHeader = mapHeaderIndex.at(pindexBest->GetBlockHash());
+                int nAsk = 0;
+                while (pindexHeader->pnext && nAsk < 500) {
+                    pindexHeader = pindexHeader->pnext;
+                    pto->AskFor(CInv(MSG_BLOCK, pindexHeader->pheader->GetHash()));
+                    nAsk++;
+                }
+            }
+        }
+
         vector<CInv> vGetData;
         int64 nNow = GetTime() * 1000000;
         CTxDB txdb("r");

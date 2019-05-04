@@ -341,8 +341,13 @@ bool CheckStakeKernelHash(unsigned int nBits, const CBlock& blockFrom, unsigned 
 	uint64 nStakeModifier = 0;
 	int nStakeModifierHeight = 0;
 	int64 nStakeModifierTime = 0;
-	if (!GetKernelStakeModifier(blockFrom.GetHash(), nStakeModifier, nStakeModifierHeight, nStakeModifierTime, fPrintProofOfStake))
-		return false;
+	if (!GetKernelStakeModifier(blockFrom.GetHash(), nStakeModifier, nStakeModifierHeight, nStakeModifierTime, fPrintProofOfStake)) {
+	    if (fPrintProofOfStake)
+	        printf("%s: failed to get kernel stake modifier.\n", __func__);
+        return false;
+	}
+
+	printf("modifier: %016llx\n", nStakeModifier);
 		
 	//create data stream once instead of repeating it in the loop
 	CDataStream ss(SER_GETHASH, 0);

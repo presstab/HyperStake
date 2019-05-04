@@ -68,6 +68,7 @@ class CMessageHeader
 enum
 {
     NODE_NETWORK = (1 << 0),
+    NODE_HEADERS = (1 << 2), // send inventory with associated height
 };
 
 /** A CService with information about it as peer */
