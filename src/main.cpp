@@ -4191,8 +4191,12 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         //
         if (pto->fRequestNextSetOfBlockData || (pto->mapAskFor.empty() && pindexBest->nHeight < pindexBestHeader->nHeight)) {
             bool fForce = pto->fRequestNextSetOfBlockData;
-            pto->fRequestNextSetOfBlockData = false;
+            //If this peer has a reported best height that is higher than our height, then ask them to fill in our missing block data
+            if (pindexBestHeader)
+                fForce = fForce || pto->nStartingHeight > pindexBestHeader->nHeight;
+
             //If we received all of the blocks we asked for, ask for more.
+            pto->fRequestNextSetOfBlockData = false;
             if (fForce || mapBlockIndex.count(pto->hashLastBlockRequest)) {
                 printf("%s:%d Asking for more blocks from peer %s because they have previously sent more headers.\n", __func__, __LINE__, pto->addrName.c_str());
                 auto pindexHeader = mapHeaderIndex.at(pindexBest->GetBlockHash());
