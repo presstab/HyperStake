@@ -3785,7 +3785,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             if (mi != mapHeaderIndex.end()) {
                 if (nBestHeight - mi->second->nHeight < 200) {
                     mapStagedBlocks[hashBlock] = block;
-                    printf("%s:%d staging block %s\n", __func__, __LINE__, hashBlock.GetHex().c_str());
+                    printf("%s:%d staging block %s height=%d chainheight=%d\n", __func__, __LINE__, hashBlock.GetHex().c_str(), mi->second->nHeight, nBestHeight);
                     return true;
                 }
             }
