@@ -99,6 +99,13 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPri
         result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
     if (blockindex->pnext)
         result.push_back(Pair("nextblockhash", blockindex->pnext->GetBlockHash().GetHex()));
+    if (pindexBestHeader) {
+        Object objBestHeader;
+        objBestHeader.push_back(Pair("height", (int)pindexBestHeader->nHeight));
+        objBestHeader.push_back(Pair("bestheader", pindexBestHeader->pheader->GetHash().GetHex()));
+        objBestHeader.push_back(Pair("previoushash", pindexBestHeader->pprev->pheader->GetHash().GetHex()));
+        result.push_back(Pair("bestheader", objBestHeader));
+    }
 
     result.push_back(Pair("flags", strprintf("%s%s", blockindex->IsProofOfStake()? "proof-of-stake" : "proof-of-work", blockindex->GeneratedStakeModifier()? " stake-modifier": "")));
     result.push_back(Pair("proofhash", blockindex->IsProofOfStake()? blockindex->hashProofOfStake.GetHex() : blockindex->GetBlockHash().GetHex()));
@@ -123,6 +130,26 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPri
 
     result.push_back(Pair("tx", txinfo));
     result.push_back(Pair("signature", HexStr(block.vchBlockSig.begin(), block.vchBlockSig.end())));
+
+    return result;
+}
+
+Value getheaderinfo(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+                "getheaderinfo <blockhash>\n"
+                "Returns information about headers syncing.");
+
+    std::string strHash = params[0].get_str();
+    uint256 hash(strHash);
+    if (!mapHeaderIndex.count(hash))
+        return "Cannot find matching header";
+
+    Object result;
+    result.push_back(Pair("height", (int)pindexBestHeader->nHeight));
+    result.push_back(Pair("bestheader", pindexBestHeader->pheader->GetHash().GetHex()));
+    result.push_back(Pair("previoushash", pindexBestHeader->pprev->pheader->GetHash().GetHex()));
 
     return result;
 }

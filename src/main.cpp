@@ -3751,7 +3751,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             mapAlreadyAskedFor.erase(inv);
             if (IsInitialBlockDownload()) {
                 if (pfrom->hashLastHeaderSent == hashBlock || pfrom->hashLastBlockRequest == hashBlock) {
-                    printf("%s: getheaders after last block recvd\n", __func__);
+                    printf("%s: getheaders after last block recvd lastheadersent=%s lastblockrequest=%s\n", __func__,
+                            pfrom->hashLastHeaderSent.GetHex().c_str(), pfrom->hashLastBlockRequest.GetHex().c_str());
                     pfrom->PushGetHeaders(pindexBest, uint256(0));
                     pfrom->nTimeLastGetBlocks = GetTimeMillis();
                 }
