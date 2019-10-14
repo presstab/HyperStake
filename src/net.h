@@ -226,6 +226,7 @@ public:
     uint256 hashLastBlockSent;
     uint256 hashLastHeaderSent;
     uint256 hashLastBlockRequest;
+    bool fRequestNextSetOfBlockData; // use known headers to ask this peer for blocks matching those headers
 
     // flood relay
     std::vector<CAddress> vAddrToSend;
@@ -272,6 +273,7 @@ public:
         hashCheckpointKnown = 0;
         setInventoryKnown.max_size(SendBufferSize() / 1000);
         nTimeLastGetBlocks = 0;
+        fRequestNextSetOfBlockData = false;
 
         // Be shy and don't send version until we hear
         if (!fInbound)

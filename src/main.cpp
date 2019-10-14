@@ -3786,7 +3786,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 //                pfrom->PushGetBlocks(pindexAsk, uint256(0));
             }
         } else if (!fHavePrev) {
-		    if (pfrom->nTimeLastGetBlocks == 0 || GetTimeMillis() - pfrom->nTimeLastGetBlocks > 100) {
+            if (mapHeaderIndex.count(block.hashPrevBlock)) {
+                //Have header, but do not have prev block, ask peer to send next set of block data
+                pfrom->fRequestNextSetOfBlockData = true;
+            } else if (pfrom->nTimeLastGetBlocks == 0 || GetTimeMillis() - pfrom->nTimeLastGetBlocks > 100) {
                 //This could be the top block sent from the peer, which signals to us that they are ready for another
                 //round of getblocks
                 printf("Asking for more headers from %s to %s peer %s\n", pindexBest->GetBlockHash().GetHex().c_str(),
@@ -4186,10 +4189,11 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         //
         // Message: getdata
         //
-        if (pto->mapAskFor.empty() && pindexBest->nHeight < pindexBestHeader->nHeight) {
-
+        if (pto->fRequestNextSetOfBlockData || (pto->mapAskFor.empty() && pindexBest->nHeight < pindexBestHeader->nHeight)) {
+            bool fForce = pto->fRequestNextSetOfBlockData;
+            pto->fRequestNextSetOfBlockData = false;
             //If we received all of the blocks we asked for, ask for more.
-            if (mapBlockIndex.count(pto->hashLastBlockRequest)) {
+            if (fForce || mapBlockIndex.count(pto->hashLastBlockRequest)) {
                 printf("%s:%d Asking for more blocks from peer %s because they have previously sent more headers.\n", __func__, __LINE__, pto->addrName.c_str());
                 auto pindexHeader = mapHeaderIndex.at(pindexBest->GetBlockHash());
                 int nAsk = 0;
@@ -4198,6 +4202,8 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     pto->AskFor(CInv(MSG_BLOCK, pindexHeader->pheader->GetHash()));
                     nAsk++;
                 }
+            } else {
+                printf("%s:%d not asking peer for blocks %s.\n", __func__, __LINE__, pto->addrName.c_str());
             }
         }
 
