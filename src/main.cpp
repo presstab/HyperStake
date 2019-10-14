@@ -3127,6 +3127,7 @@ bool static AlreadyHave(CTxDB& txdb, const CInv& inv)
 unsigned char pchMessageStart[4] = { 0xdb, 0xad, 0xbd, 0xda };
 unsigned int nLastMapGetBlocksClear = 0;
 std::map<uint256, CBlock> mapStagedBlocks;
+CCriticalSection cs_staging;
 
 bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 {
@@ -3751,6 +3752,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         if (!fHavePrev) {
             //First process staged blocks
             uint256 hashBest = pindexBest->GetBlockHash();
+            LOCK(cs_staging);
             if (mapHeaderIndex.count(hashBest)) {
                 auto pindexHeader = mapHeaderIndex.at(hashBest);
                 while (pindexHeader->pnext) {
@@ -3778,6 +3780,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         //If we still don't have the previous, but this is not far from our current block, then add it to staging
         if (!fHavePrev) {
+            LOCK(cs_staging);
             auto mi = mapHeaderIndex.find(hashBlock);
             if (mi != mapHeaderIndex.end()) {
                 if (nBestHeight - mi->second->nHeight < 200) {
