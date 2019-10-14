@@ -3762,7 +3762,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                     if (hashProcessBlock != hashBlock && hashProcessBlock != block.hashPrevBlock && !mapStagedBlocks.count(hashProcessBlock))
                         break;
 
-                    bool fProcessed = ProcessBlock(nullptr, &mapStagedBlocks.at(hashProcessBlock));
+                    ProcessBlock(nullptr, &mapStagedBlocks.at(hashProcessBlock));
                     mapStagedBlocks.erase(hashProcessBlock);
                     printf("%s:%d Process staged block %s\n", __func__, __LINE__, hashProcessBlock.GetHex().c_str());
                 }
@@ -3782,6 +3782,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             if (mi != mapHeaderIndex.end()) {
                 if (nBestHeight - mi->second->nHeight < 200) {
                     mapStagedBlocks[hashBlock] = block;
+                    printf("%s:%d staging block %s\n", __func__, __LINE__, hashBlock.GetHex().c_str());
                     return true;
                 }
             }
