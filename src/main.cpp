@@ -3126,6 +3126,7 @@ bool static AlreadyHave(CTxDB& txdb, const CInv& inv)
 // a large 4-byte int at any alignment.
 unsigned char pchMessageStart[4] = { 0xdb, 0xad, 0xbd, 0xda };
 unsigned int nLastMapGetBlocksClear = 0;
+std::map<uint256, CBlock> mapStagedBlocks;
 
 bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 {
@@ -3747,6 +3748,45 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CInv inv(MSG_BLOCK, hashBlock);
         pfrom->AddInventoryKnown(inv);
         bool fHavePrev = mapBlockIndex.count(block.hashPrevBlock) > 0;
+        if (!fHavePrev) {
+            //First process staged blocks
+            uint256 hashBest = pindexBest->GetBlockHash();
+            if (mapHeaderIndex.count(hashBest)) {
+                auto pindexHeader = mapHeaderIndex.at(hashBest);
+                while (pindexHeader->pnext) {
+                    pindexHeader = pindexHeader->pnext;
+                    //See if the next block is staged
+                    uint256 hashProcessBlock = pindexHeader->pheader->GetHash();
+
+                    //Nothing that is able to be added to the chain here
+                    if (hashProcessBlock != hashBlock && hashProcessBlock != block.hashPrevBlock && !mapStagedBlocks.count(hashProcessBlock))
+                        break;
+
+                    bool fProcessed = ProcessBlock(nullptr, &mapStagedBlocks.at(hashProcessBlock));
+                    mapStagedBlocks.erase(hashProcessBlock);
+                    printf("%s:%d Process staged block %s\n", __func__, __LINE__, hashProcessBlock.GetHex().c_str());
+                }
+            }
+        }
+
+        //If processed in staging return here.
+        if (mapBlockIndex.count(hashBlock))
+            return true;
+
+        //Reevaluate if previous was added during the processing of staging
+        fHavePrev = mapBlockIndex.count(block.hashPrevBlock) > 0;
+
+        //If we still don't have the previous, but this is not far from our current block, then add it to staging
+        if (!fHavePrev) {
+            auto mi = mapHeaderIndex.find(hashBlock);
+            if (mi != mapHeaderIndex.end()) {
+                if (nBestHeight - mi->second->nHeight < 200) {
+                    mapStagedBlocks[hashBlock] = block;
+                    return true;
+                }
+            }
+        }
+
         if (fHavePrev && ProcessBlock(pfrom, &block)) {
             mapAlreadyAskedFor.erase(inv);
             if (IsInitialBlockDownload()) {
@@ -4055,7 +4095,7 @@ bool ProcessMessages(CNode* pfrom)
     return fOk;
 }
 
-
+std::map<uint256, int64_t> mapRequestedBlocks; // Block requested and time it was requested
 bool SendMessages(CNode* pto, bool fSendTrickle)
 {
     TRY_LOCK(cs_main, lockMain);
@@ -4185,7 +4225,6 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         if (!vInv.empty())
             pto->PushMessage("inv", vInv);
 
-
         //
         // Message: getdata
         //
@@ -4201,10 +4240,17 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 printf("%s:%d Asking for more blocks from peer %s because they have previously sent more headers.\n", __func__, __LINE__, pto->addrName.c_str());
                 auto pindexHeader = mapHeaderIndex.at(pindexBest->GetBlockHash());
                 int nAsk = 0;
-                while (pindexHeader->pnext && nAsk < 500) {
+                while (pindexHeader->pnext && nAsk < 100) {
                     pindexHeader = pindexHeader->pnext;
-                    pto->AskFor(CInv(MSG_BLOCK, pindexHeader->pheader->GetHash()));
-                    nAsk++;
+                    uint256 hashRequest = pindexHeader->pheader->GetHash();
+
+                    //If the block has not been requested, or the last request was over 1 second ago, then ask for it
+                    auto mi = mapRequestedBlocks.find(hashRequest);
+                    if (mi == mapRequestedBlocks.end() || GetTimeMillis() - mi->second > 1000) {
+                        pto->AskFor(CInv(MSG_BLOCK, hashRequest));
+                        nAsk++;
+                        mapRequestedBlocks[hashRequest] = GetTimeMillis();
+                    }
                 }
             } else {
                 printf("%s:%d not asking peer for blocks %s.\n", __func__, __LINE__, pto->addrName.c_str());
